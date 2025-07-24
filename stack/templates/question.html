@@ -32,7 +32,10 @@
                         <h5>{{ question.title }}</h5>
                         <p>{{ question.content }}</p>
                         <small>Posted by {{ question.author }} on {{ question.date_posted.strftime('%Y-%m-%d %H:%M:%S') }}</small>
+
+
                     </li>
+
                 {% endfor %}
             </ul>
         {% else %}

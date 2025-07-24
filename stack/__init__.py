@@ -12,6 +12,8 @@ from flask_jwt_extended import get_jwt_identity, jwt_required, create_access_tok
 from stack.forms import UserForm, LoginForm, QuestionForm, AnswerForm, ChangePasswordForm
 from stack.models import QuestionModel, UserModel, AnswerModel
 from stack.dependencies import db,api,jwt
+from flask_login import LoginManager, current_user, login_required,login_user
+
 
 class TokenBlocklist(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -85,12 +87,14 @@ def create_app():
         return render_template("index.html", title="HomePage", questions=questions)
 
     @app.route('/login', methods=['GET', 'POST'])
+
     def login():
         form = LoginForm()
         if form.validate_on_submit():
             user = UserModel.query.filter_by(email=form.email.data).first()
             if user and user.check_password(form.password.data):
                 access_token = create_access_token(identity=str(user.id))
+
                 response = make_response(redirect(url_for('question')))
                 response.set_cookie('access_token_cookie', access_token, httponly=True, max_age=60 * 60, samesite='lax')
                 flash("Logged in successfully!", "success")
@@ -122,6 +126,7 @@ def create_app():
         return render_template("register.html", title="Register", form=form)
 
     @app.route('/question', methods=['GET', 'POST'])
+
     @jwt_required()
     def question():
         user_id = get_jwt_identity()
@@ -264,6 +269,38 @@ def create_app():
         unset_jwt_cookies(response)  # Clears access_token_cookie
         flash("Logged out successfully!", "success")
         return response
+
+    @app.route('/question/delete/<int:question_id>', methods=['POST'])
+    @jwt_required()
+    def delete_question(question_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.get(user_id)
+        question = QuestionModel.query.get_or_404(question_id)
+
+        if question.author != user.name:
+            flash("You are not authorized to delete this question.", "error")
+            return redirect(url_for('home'))  # or abort(403)
+
+        db.session.delete(question)
+        db.session.commit()
+        flash("Question deleted successfully.", "success")
+        return redirect(url_for('profile'))
+
+    @app.route('/answer/delete/<int:answer_id>', methods=['POST'])
+    @jwt_required()
+    def delete_answer(answer_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.get(user_id)
+        answer = AnswerModel.query.get_or_404(answer_id)
+
+        if answer.author != user.name:
+            flash("You are not authorized to delete this answer.", "error")
+            return redirect(url_for('home'))  # or abort(403)
+
+        db.session.delete(answer)
+        db.session.commit()
+        flash("Answer deleted successfully.", "success")
+        return redirect(url_for('profile'))
 
     with app.app_context():
 

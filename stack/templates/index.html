@@ -3,8 +3,15 @@
 
 {% block content %}
 <div class="container">
+    {% if current_user.is_authenticated %}
+      <a href="{{ url_for('question') }}"   class="btn "  style="background-color: #d6b3ff;"    >Ask Question</a>
+    {% else %}
+      <a   style="background-color: #d6b3ff;"   class="btn " href="{{url_for('register')}}">Ask Question</a>
+    {% endif %}
+    <br>
+    <br>
 
-    <h2>Recently Asked Questions</h2>
+    <h2  >Recently Asked Questions</h2>
     {% for question in questions %}
     <div class="question">
         <h3>{{ question.title }}</h3>
