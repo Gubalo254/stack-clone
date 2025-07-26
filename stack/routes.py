@@ -110,3 +110,44 @@ class User(Resource):
             db.session.add(answer)
             db.session.commit()
             return {"message": "Answer posted successfully"}, 201
+
+
+class UpvoteAnswer(Resource):
+        @jwt_required()
+        def post(self, answer_id):
+            user_id = get_jwt_identity()
+            user = UserModel.query.filter_by(id=user_id).first()
+            if not user:
+                abort(401, message="User not found")
+            answer = AnswerModel.query.filter_by(id=answer_id).first()
+            if not answer:
+                abort(404, message="Answer not found")
+            if user in answer.upvoted_by:
+                abort(400, message="You have already upvoted this answer")
+            answer.upvotes += 1
+            answer.upvoted_by.append(user)
+            db.session.commit()
+            return {"message": "Answer upvoted successfully", "upvotes": answer.upvotes}, 200
+
+
+class AcceptAnswer:
+        @jwt_required()
+        def post(self, answer_id):
+            user_id = get_jwt_identity()
+            user = UserModel.query.filter_by(id=user_id).first()
+            if not user:
+                abort(401, message="User not found")
+            answer = AnswerModel.query.filter_by(id=answer_id).first()
+            if not answer:
+                abort(404, message="Answer not found")
+            question = QuestionModel.query.filter_by(id=answer.question_id).first()
+            if not question:
+                abort(404, message="Question not found")
+            if question.author != user.name:
+                abort(403, message="Only the question author can accept an answer")
+            # Unaccept any previously accepted answer
+            for ans in question.answers:
+                ans.accepted = False
+            answer.accepted = True
+            db.session.commit()
+            return {"message": "Answer accepted successfully"}, 200
