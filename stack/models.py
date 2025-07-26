@@ -38,6 +38,15 @@ class AnswerModel(db.Model):
     author = db.Column(db.String(40), nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     question_id = db.Column(db.Integer, db.ForeignKey('question_model.id'), nullable=False)
+    upvotes = db.Column(db.Integer, default=0, nullable=False)
+    accepted = db.Column(db.Boolean, default=False, nullable=False)
+    upvoted_by = db.relationship('UserModel', secondary='answer_upvotes', backref='upvoted_answers', lazy='dynamic')
 
     def __repr__(self):
-        return f"Answer(content = {self.content[:50]}, author = {self.author}, date_posted = {self.date_posted})"
+        return f"Answer(content = {self.content[:50]}, author = {self.author}, date_posted = {self.date_posted},upvotes = {self.upvotes}, accepted = {self.accepted})"
+
+answer_upvotes = db.Table('answer_upvotes',
+    db.Column('user_id', db.Integer, db.ForeignKey('user_model.id'), primary_key=True),
+    db.Column('answer_id', db.Integer, db.ForeignKey('answer_model.id'), primary_key=True)
+
+)

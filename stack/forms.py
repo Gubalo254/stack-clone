@@ -30,6 +30,11 @@ class ChangePasswordForm(FlaskForm):
     confirm_new_password = PasswordField('Confirm New Password', validators=[DataRequired(message='Password confirmation is required'), EqualTo('new_password', message='Passwords must match')])
     submit = SubmitField('Change Password')
 
+class UpvoteForm(FlaskForm):
+    submit = SubmitField('Upvote')
+
+class AcceptAnswerForm(FlaskForm):
+    submit = SubmitField('Accept Answer')
 
 userFields = {
     'id': fields.Integer,

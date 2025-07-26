@@ -9,10 +9,11 @@ import os
 from flask_jwt_extended import get_jwt_identity, jwt_required, create_access_token, verify_jwt_in_request, \
     unset_jwt_cookies, get_jwt
 
-from stack.forms import UserForm, LoginForm, QuestionForm, AnswerForm, ChangePasswordForm
+from stack.forms import UserForm, LoginForm, QuestionForm, AnswerForm, ChangePasswordForm, UpvoteForm, AcceptAnswerForm
 from stack.models import QuestionModel, UserModel, AnswerModel
 from stack.dependencies import db,api,jwt
 from flask_login import LoginManager, current_user, login_required,login_user
+from flask_migrate import Migrate
 
 
 class TokenBlocklist(db.Model):
@@ -35,20 +36,23 @@ def create_app():
     app.config['MAIL_SERVER'] = 'smtp.gmail.com'
     app.config['MAIL_PORT'] = 587
     app.config['MAIL_USE_TLS'] = True
-    app.config['MAIL_USERNAME'] = 'bruceydev@gmail.com'
-    app.config['MAIL_PASSWORD'] = 'hzxtvcynfoknlwzo'
-    app.config['MAIL_DEFAULT_SENDER'] = 'bruceydev@gmail.com'
+    app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')
+    app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+    app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')
 
     db.init_app(app)
     api.init_app(app)
     jwt.init_app(app)
     mail = Mail(app)
+    migrate = Migrate(app, db)
 
-    from .routes import Register, Login, Users, User
+    from .routes import Register, Login, Users, User, UpvoteAnswer, AcceptAnswer
     api.add_resource(Register, '/api/register/')
     api.add_resource(Login, '/api/login/')
     api.add_resource(Users, '/api/users/')
     api.add_resource(User, '/api/users/<int:id>')
+    api.add_resource(UpvoteAnswer, '/api/answer/<int:answer_id>/upvote')
+    api.add_resource(AcceptAnswer, '/api/answer/<int:answer_id>/accept')
 
     @app.context_processor
     def inject_user():
@@ -159,6 +163,8 @@ def create_app():
             flash("User not found. Please log inBond: in again.", "error")
             return redirect(url_for('login'))
         form = AnswerForm()
+        upvote_form = UpvoteForm()
+        accept_form = AcceptAnswerForm()
         question = QuestionModel.query.filter_by(id=question_id).first_or_404()
         if form.validate_on_submit():
             answer = AnswerModel(
@@ -169,7 +175,55 @@ def create_app():
             db.session.add(answer)
             db.session.commit()
             return redirect(url_for('home'))
-        return render_template("answer.html", title="Post an Answer", form=form, question=question, errors=form.errors)
+        return render_template("answer.html", title="Post an Answer", form=form, question=question, errors=form.errors,
+                               upvote_form=upvote_form, accept_form=accept_form)
+
+    @app.route('/answer/<int:answer_id>/upvote', methods=['POST'])
+    @jwt_required()
+    def upvote_answer(answer_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.filter_by(id=user_id).first()
+        if not user:
+            flash("User not found. Please log in again.", "error")
+            return redirect(url_for('login'))
+        answer = AnswerModel.query.filter_by(id=answer_id).first()
+        if not answer:
+            flash("Answer not found.", "error")
+            return redirect(url_for('home'))
+        if user in answer.upvoted_by:
+            flash("You have already upvoted this answer.", "error")
+            return redirect(url_for('answer', question_id=answer.question_id))
+        answer.upvotes += 1
+        answer.upvoted_by.append(user)
+        db.session.commit()
+        flash("Answer upvoted successfully!", "success")
+        return redirect(url_for('answer', question_id=answer.question_id))
+
+    @app.route('/answer/<int:answer_id>/accept', methods=['POST'])
+    @jwt_required()
+    def accept_answer(answer_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.filter_by(id=user_id).first()
+        if not user:
+            flash("User not found. Please log in again.", "error")
+            return redirect(url_for('login'))
+        answer = AnswerModel.query.filter_by(id=answer_id).first()
+        if not answer:
+            flash("Answer not found.", "error")
+            return redirect(url_for('home'))
+        question = QuestionModel.query.filter_by(id=answer.question_id).first()
+        if not question:
+            flash("Question not found.", "error")
+            return redirect(url_for('home'))
+        if question.author != user.name:
+            flash("Only the question author can accept an answer.", "error")
+            return redirect(url_for('answer', question_id=answer.question_id))
+        for ans in question.answers:
+            ans.accepted = False
+        answer.accepted = True
+        db.session.commit()
+        flash("Answer accepted successfully!", "success")
+        return redirect(url_for('answer', question_id=answer.question_id))
 
 
     @app.route("/about")
