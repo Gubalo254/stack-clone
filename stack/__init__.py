@@ -356,6 +356,60 @@ def create_app():
         flash("Answer deleted successfully.", "success")
         return redirect(url_for('profile'))
 
+    @app.route('/question/update/<int:question_id>', methods=['GET', 'POST'])
+    @jwt_required()
+    def update_question(question_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.get(user_id)
+        question = QuestionModel.query.get_or_404(question_id)
+
+        if question.author != user.name:
+            flash("You are not authorized to edit this question.", "error")
+            return redirect(url_for('home'))
+
+        form = QuestionForm()
+
+        if form.validate_on_submit():
+            question.title = form.title.data
+            question.content = form.content.data
+            db.session.commit()
+            flash("Question updated successfully!", "success")
+            return redirect(url_for('profile'))
+
+        # Pre-fill form with existing data
+        elif request.method == 'GET':
+            form.title.data = question.title
+            form.content.data = question.content
+
+        return render_template("update_question.html", title="Edit Question", form=form)
+
+    @app.route('/answer/update/<int:answer_id>', methods=['GET', 'POST'])
+    @jwt_required()
+    def update_answer(answer_id):
+        user_id = get_jwt_identity()
+        user = UserModel.query.get(user_id)
+        answer = AnswerModel.query.get_or_404(answer_id)
+
+        if answer.author != user.name:
+            flash("You are not authorized to edit this question.", "error")
+            return redirect(url_for('home'))
+
+        form = AnswerForm()
+
+        if form.validate_on_submit():
+
+            answer.content = form.content.data
+            db.session.commit()
+            flash("Answer updated successfully!", "success")
+            return redirect(url_for('profile'))
+
+        # Pre-fill form with existing data
+        elif request.method == 'GET':
+
+            form.content.data = answer.content
+
+        return render_template("update_answer.html", title="Edit Answer", form=form)
+
     with app.app_context():
 
         db.create_all()
